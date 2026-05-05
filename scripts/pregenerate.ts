@@ -7,7 +7,7 @@
 import { buildAutopsy } from "../src/lib/autopsy";
 import { upsertAutopsy } from "../src/lib/db";
 
-const SEEDS = [
+const SEEDS: string[] = [
   // Add famous Solana rug token mints here. Keep list small for trial-tier API.
   // Example placeholders — replace before running:
   // "So11111111111111111111111111111111111111112",
