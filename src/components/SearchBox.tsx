@@ -25,7 +25,7 @@ export default function SearchBox() {
           autoFocus
           value={v}
           onChange={(e) => setV(e.target.value)}
-          placeholder="paste a Solana token address..."
+          placeholder="paste an EVM token address (0x...)"
           className="flex-1 bg-transparent outline-none font-mono text-sm"
         />
       </div>
