@@ -6,9 +6,10 @@ import { fmtUsd, shortAddr } from "@/lib/format";
 import WatchButton from "@/components/WatchButton";
 
 export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: { address: string } }) {
-  const a = await getOrBuildAutopsy(params.address).catch(() => null);
+  const a = await getOrBuildAutopsy(params.address, false).catch(() => null);
   if (!a) return { title: "Autopsy not found" };
   return {
     title: `${a.symbol ?? "Token"} autopsy — $${Math.round(a.total_drained_usd ?? 0).toLocaleString()} drained`,
@@ -16,8 +17,15 @@ export async function generateMetadata({ params }: { params: { address: string }
   };
 }
 
-export default async function AutopsyPage({ params }: { params: { address: string } }) {
-  const a = await getOrBuildAutopsy(params.address).catch(() => null);
+export default async function AutopsyPage({
+  params,
+  searchParams,
+}: {
+  params: { address: string };
+  searchParams?: { refresh?: string };
+}) {
+  const force = searchParams?.refresh === "1";
+  const a = await getOrBuildAutopsy(params.address, force).catch(() => null);
   if (!a) return notFound();
 
   return (
@@ -136,11 +144,11 @@ export default async function AutopsyPage({ params }: { params: { address: strin
           <span>data: GoldRush</span>
           <a
             className="flex items-center gap-1 hover:text-white"
-            href={`https://solscan.io/token/${params.address}`}
+            href={`https://etherscan.io/token/${params.address}`}
             target="_blank"
             rel="noreferrer"
           >
-            solscan <ExternalLink className="w-3 h-3" />
+            etherscan <ExternalLink className="w-3 h-3" />
           </a>
         </div>
       </footer>

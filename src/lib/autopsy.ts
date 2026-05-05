@@ -15,9 +15,13 @@ import { narrate } from "./narrate";
 const CHAIN: Chain = "eth-mainnet";
 const FRESH_MS = 1000 * 60 * 60 * 6; // 6h
 
-export async function getOrBuildAutopsy(address: string): Promise<Autopsy | null> {
+export async function getOrBuildAutopsy(address: string, force = false): Promise<Autopsy | null> {
   const cached = await getCachedAutopsy(address);
-  if (cached?.updated_at && Date.now() - new Date(cached.updated_at).getTime() < FRESH_MS) {
+  if (
+    !force &&
+    cached?.updated_at &&
+    Date.now() - new Date(cached.updated_at).getTime() < FRESH_MS
+  ) {
     return cached;
   }
   const built = await buildAutopsy(address).catch((e) => {
