@@ -34,7 +34,7 @@ export async function narrate(a: Autopsy): Promise<string | null> {
       {
         role: "system",
         content:
-          "You write concise forensic post-mortems for rugged Solana tokens. 4–6 sentences. Plain English, no hype, no emojis. Reference the timeline and extractor numbers. End with one sentence about the deployer if known.",
+          "You write concise forensic post-mortems for suspicious EVM tokens. 4–6 sentences. Plain English, no hype, no emojis. Use the chain name from the data. Reference the timeline and extractor numbers. End with one sentence about the deployer if known. Never invent facts not present in the JSON.",
       },
       { role: "user", content: JSON.stringify(facts) },
     ],
