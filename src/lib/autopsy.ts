@@ -41,6 +41,18 @@ export async function buildAutopsy(address: string): Promise<Autopsy> {
   const holders: any = holdersR.status === "fulfilled" ? holdersR.value : { items: [] };
   const evs: any = evsR.status === "fulfilled" ? evsR.value : { items: [] };
 
+  console.log("[autopsy]", address, {
+    metaStatus: metaR.status,
+    metaErr: metaR.status === "rejected" ? String((metaR as any).reason?.message) : null,
+    holdersCount: holders?.items?.length ?? 0,
+    holdersStatus: holdersR.status,
+    holdersErr: holdersR.status === "rejected" ? String((holdersR as any).reason?.message) : null,
+    evsCount: evs?.items?.length ?? 0,
+    evsStatus: evsR.status,
+    evsErr: evsR.status === "rejected" ? String((evsR as any).reason?.message) : null,
+    firstEventSample: evs?.items?.[0] ? Object.keys(evs.items[0]) : null,
+  });
+
   if (
     !meta &&
     !holders?.items?.length &&
