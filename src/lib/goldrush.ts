@@ -66,7 +66,7 @@ export async function walletBalances(chain: Chain, address: string) {
 export async function logEvents(
   chain: Chain,
   address: string,
-  startingBlock?: number,
+  startingBlock?: number | "earliest" | "latest",
   endingBlock?: number | "latest"
 ) {
   return gr(`/${chain}/events/address/${address}/`, {

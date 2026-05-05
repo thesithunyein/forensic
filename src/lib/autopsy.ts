@@ -32,33 +32,23 @@ export async function buildAutopsy(address: string): Promise<Autopsy> {
   // Run all endpoints in parallel, none can hard-fail the autopsy.
   // Note: transfers_v2 needs a wallet path, so we skip it for token-level autopsy.
   // Token activity comes from logEvents (decoded Transfer/Swap topics).
-  const [metaR, holdersR, evsR] = await Promise.allSettled([
-    tokenMetadata(CHAIN, address),
+  const [holdersR, evsR] = await Promise.allSettled([
     tokenHolders(CHAIN, address, 100),
-    logEvents(CHAIN, address, 0, "latest"),
+    logEvents(CHAIN, address, "earliest", "latest"),
   ]);
-  const meta: any = metaR.status === "fulfilled" ? metaR.value : null;
   const holders: any = holdersR.status === "fulfilled" ? holdersR.value : { items: [] };
   const evs: any = evsR.status === "fulfilled" ? evsR.value : { items: [] };
+  const meta: any = null; // metadata derived from holders[0]
 
   console.log("[autopsy]", address, {
-    metaStatus: metaR.status,
-    metaErr: metaR.status === "rejected" ? String((metaR as any).reason?.message) : null,
     holdersCount: holders?.items?.length ?? 0,
-    holdersStatus: holdersR.status,
     holdersErr: holdersR.status === "rejected" ? String((holdersR as any).reason?.message) : null,
     evsCount: evs?.items?.length ?? 0,
-    evsStatus: evsR.status,
     evsErr: evsR.status === "rejected" ? String((evsR as any).reason?.message) : null,
-    firstEventSample: evs?.items?.[0] ? Object.keys(evs.items[0]) : null,
   });
 
-  if (
-    !meta &&
-    !holders?.items?.length &&
-    !evs?.items?.length
-  ) {
-    const errs = [metaR, holdersR, evsR]
+  if (!holders?.items?.length && !evs?.items?.length) {
+    const errs = [holdersR, evsR]
       .filter((r) => r.status === "rejected")
       .map((r: any) => r.reason?.message ?? String(r.reason));
     throw new Error("All data sources empty: " + errs.join(" | "));
