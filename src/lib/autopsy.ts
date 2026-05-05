@@ -5,6 +5,7 @@ import {
   walletTransactions,
   walletBalances,
   logEvents,
+  latestBlock,
 } from "./goldrush";
 import { getCachedAutopsy, upsertAutopsy } from "./db";
 import { humanDuration } from "./format";
@@ -32,9 +33,15 @@ export async function buildAutopsy(address: string): Promise<Autopsy> {
   // Run all endpoints in parallel, none can hard-fail the autopsy.
   // Note: transfers_v2 needs a wallet path, so we skip it for token-level autopsy.
   // Token activity comes from logEvents (decoded Transfer/Swap topics).
+  // Trial-tier max range is 1M blocks. Window to most recent ~1M.
+  const tip = await latestBlock(CHAIN);
+  const evWindow: [number | "earliest", number | "latest"] = tip
+    ? [Math.max(0, tip - 999_000), "latest"]
+    : ["earliest", "latest"];
+
   const [holdersR, evsR] = await Promise.allSettled([
     tokenHolders(CHAIN, address, 100),
-    logEvents(CHAIN, address, "earliest", "latest"),
+    logEvents(CHAIN, address, evWindow[0], evWindow[1]),
   ]);
   const holders: any = holdersR.status === "fulfilled" ? holdersR.value : { items: [] };
   const evs: any = evsR.status === "fulfilled" ? evsR.value : { items: [] };

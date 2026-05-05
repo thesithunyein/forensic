@@ -76,6 +76,16 @@ export async function logEvents(
   });
 }
 
+// Get current block height for a chain
+export async function latestBlock(chain: Chain): Promise<number | null> {
+  try {
+    const data: any = await gr(`/${chain}/block_v2/latest/`);
+    return data?.items?.[0]?.height ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // Historical price by ticker / address
 export async function historicalPrice(chain: Chain, address: string, fromIso: string, toIso: string) {
   return gr(`/pricing/historical_by_addresses_v2/${chain}/USD/${address}/`, {
