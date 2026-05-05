@@ -38,10 +38,14 @@ export async function buildAutopsy(address: string): Promise<Autopsy> {
   // Note: transfers_v2 needs a wallet path, so we skip it for token-level autopsy.
   // Token activity comes from logEvents (decoded Transfer/Swap topics).
   // Trial-tier max range is 1M blocks. Window to most recent ~1M.
-  const tip = await latestBlock(CHAIN);
-  const evWindow: [number | "earliest", number | "latest"] = tip
-    ? [Math.max(0, tip - 999_000), "latest"]
-    : ["earliest", "latest"];
+  // Try API first; on failure estimate from genesis (Eth: 2015-07-30, ~12s blocks).
+  const tip =
+    (await latestBlock(CHAIN)) ??
+    Math.floor((Date.now() - 1438269988_000) / 12_000);
+  const evWindow: [number, number | "latest"] = [
+    Math.max(0, tip - 999_000),
+    "latest",
+  ];
 
   const [holdersR, evsR] = await Promise.allSettled([
     tokenHolders(CHAIN, address, 100),
@@ -52,6 +56,8 @@ export async function buildAutopsy(address: string): Promise<Autopsy> {
   const meta: any = null; // metadata derived from holders[0]
 
   console.log("[autopsy]", address, {
+    tip,
+    evWindow,
     holdersCount: holders?.items?.length ?? 0,
     holdersErr: holdersR.status === "rejected" ? String((holdersR as any).reason?.message) : null,
     evsCount: evs?.items?.length ?? 0,
