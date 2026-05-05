@@ -29,14 +29,14 @@ export default async function HomePage() {
           Every rug, <span className="text-accent">autopsied.</span>
         </h1>
         <p className="mt-5 text-lg text-muted">
-          Paste any Solana token. Get a forensic post-mortem: timeline, top
-          extractors, deployer dossier, total drained.
+          Paste any EVM token (Ethereum, Base, BSC). Get a forensic post-mortem:
+          timeline, top extractors, deployer dossier, total drained.
         </p>
         <div className="mt-10">
           <SearchBox />
         </div>
         <div className="mt-6 text-xs text-muted font-mono">
-          powered by GoldRush · classified DEX swaps · cross-chain deployer intel
+          powered by GoldRush · decoded log events · cross-chain deployer intel
         </div>
       </section>
 

@@ -12,7 +12,7 @@ import { humanDuration } from "./format";
 import type { Autopsy, Extractor, TimelineEvent, Deployer } from "./types";
 import { narrate } from "./narrate";
 
-const CHAIN: Chain = "solana-mainnet";
+const CHAIN: Chain = "eth-mainnet";
 const FRESH_MS = 1000 * 60 * 60 * 6; // 6h
 
 export async function getOrBuildAutopsy(address: string): Promise<Autopsy | null> {
