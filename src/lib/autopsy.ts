@@ -30,23 +30,39 @@ export async function getOrBuildAutopsy(address: string): Promise<Autopsy | null
 }
 
 export async function buildAutopsy(address: string): Promise<Autopsy> {
-  const meta: any = await tokenMetadata(CHAIN, address);
-  const item = meta?.items?.[0] ?? meta;
+  // Run all endpoints in parallel, none can hard-fail the autopsy.
+  const [metaR, holdersR, transfersR, evsR] = await Promise.allSettled([
+    tokenMetadata(CHAIN, address),
+    tokenHolders(CHAIN, address, 100),
+    tokenTransfers(CHAIN, address, address),
+    logEvents(CHAIN, address),
+  ]);
+  const meta: any = metaR.status === "fulfilled" ? metaR.value : null;
+  const holders: any = holdersR.status === "fulfilled" ? holdersR.value : { items: [] };
+  const transfers: any = transfersR.status === "fulfilled" ? transfersR.value : { items: [] };
+  const evs: any = evsR.status === "fulfilled" ? evsR.value : { items: [] };
 
+  if (
+    !meta &&
+    !holders?.items?.length &&
+    !transfers?.items?.length &&
+    !evs?.items?.length
+  ) {
+    const errs = [metaR, holdersR, transfersR, evsR]
+      .filter((r) => r.status === "rejected")
+      .map((r: any) => r.reason?.message ?? String(r.reason));
+    throw new Error("All data sources empty: " + errs.join(" | "));
+  }
+
+  const item = meta?.items?.[0] ?? meta ?? holders?.items?.[0];
   const symbol = item?.contract_ticker_symbol ?? null;
   const name = item?.contract_name ?? null;
 
-  // Holders → victim count + top concentration
-  const holders: any = await tokenHolders(CHAIN, address, 100).catch(() => ({ items: [] }));
   const victim_count = holders?.items?.length ?? null;
 
-  // Transfers in/out → extractor ranking
-  const transfers: any = await tokenTransfers(CHAIN, address, address).catch(() => ({ items: [] }));
   const extractors = rankExtractors(transfers?.items ?? []);
   const total_drained_usd = sum(extractors.map((e) => e.realized_usd));
 
-  // Log events → timeline (LP add/remove, swaps classified)
-  const evs: any = await logEvents(CHAIN, address).catch(() => ({ items: [] }));
   const timeline = buildTimeline(evs?.items ?? [], transfers?.items ?? []);
 
   const lifespan_ms = lifespanFromTimeline(timeline);
