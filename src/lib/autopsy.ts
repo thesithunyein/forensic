@@ -2,7 +2,6 @@ import {
   Chain,
   tokenMetadata,
   tokenHolders,
-  tokenTransfers,
   walletTransactions,
   walletBalances,
   logEvents,
@@ -31,24 +30,23 @@ export async function getOrBuildAutopsy(address: string): Promise<Autopsy | null
 
 export async function buildAutopsy(address: string): Promise<Autopsy> {
   // Run all endpoints in parallel, none can hard-fail the autopsy.
-  const [metaR, holdersR, transfersR, evsR] = await Promise.allSettled([
+  // Note: transfers_v2 needs a wallet path, so we skip it for token-level autopsy.
+  // Token activity comes from logEvents (decoded Transfer/Swap topics).
+  const [metaR, holdersR, evsR] = await Promise.allSettled([
     tokenMetadata(CHAIN, address),
     tokenHolders(CHAIN, address, 100),
-    tokenTransfers(CHAIN, address, address),
-    logEvents(CHAIN, address),
+    logEvents(CHAIN, address, 0, "latest"),
   ]);
   const meta: any = metaR.status === "fulfilled" ? metaR.value : null;
   const holders: any = holdersR.status === "fulfilled" ? holdersR.value : { items: [] };
-  const transfers: any = transfersR.status === "fulfilled" ? transfersR.value : { items: [] };
   const evs: any = evsR.status === "fulfilled" ? evsR.value : { items: [] };
 
   if (
     !meta &&
     !holders?.items?.length &&
-    !transfers?.items?.length &&
     !evs?.items?.length
   ) {
-    const errs = [metaR, holdersR, transfersR, evsR]
+    const errs = [metaR, holdersR, evsR]
       .filter((r) => r.status === "rejected")
       .map((r: any) => r.reason?.message ?? String(r.reason));
     throw new Error("All data sources empty: " + errs.join(" | "));
@@ -60,16 +58,17 @@ export async function buildAutopsy(address: string): Promise<Autopsy> {
 
   const victim_count = holders?.items?.length ?? null;
 
-  const extractors = rankExtractors(transfers?.items ?? []);
+  const events = evs?.items ?? [];
+  const extractors = rankExtractorsFromEvents(events, address);
   const total_drained_usd = sum(extractors.map((e) => e.realized_usd));
 
-  const timeline = buildTimeline(evs?.items ?? [], transfers?.items ?? []);
+  const timeline = buildTimeline(events);
 
   const lifespan_ms = lifespanFromTimeline(timeline);
   const lifespan_human = lifespan_ms ? humanDuration(lifespan_ms) : null;
 
-  // Deployer: try to extract from earliest mint/transfer
-  const deployer = await dossier(address, transfers?.items ?? []).catch(() => null);
+  // Deployer: try to extract from earliest event sender
+  const deployer = await dossier(address, events).catch(() => null);
 
   const partial: Autopsy = {
     token_address: address,
@@ -90,21 +89,26 @@ export async function buildAutopsy(address: string): Promise<Autopsy> {
   return partial;
 }
 
-function rankExtractors(transfers: any[]): Extractor[] {
+function rankExtractorsFromEvents(events: any[], token: string): Extractor[] {
+  // Decoded ERC20 Transfer events: params [from, to, value]. We rank by total value moved out per address.
   const by: Record<string, number> = {};
-  for (const t of transfers) {
-    const usd = Number(t?.delta_quote ?? t?.value_quote ?? 0);
-    if (!usd || usd <= 0) continue;
-    const w = (t?.transfer_type === "OUT" ? t?.from_address : t?.to_address) as string | undefined;
-    if (!w) continue;
-    by[w] = (by[w] ?? 0) + usd;
+  for (const e of events) {
+    const name = (e?.decoded?.name ?? "").toLowerCase();
+    if (name !== "transfer") continue;
+    const params = e?.decoded?.params ?? [];
+    const from = params.find((p: any) => p?.name === "from")?.value;
+    const value = Number(params.find((p: any) => p?.name === "value")?.value ?? 0);
+    const usd = Number(e?.value_quote ?? 0) || 0;
+    if (!from) continue;
+    if (from.toLowerCase() === token.toLowerCase()) continue;
+    by[from] = (by[from] ?? 0) + (usd > 0 ? usd : value / 1e18);
   }
   return Object.entries(by)
     .map(([address, realized_usd]) => ({ address, realized_usd }))
     .sort((a, b) => b.realized_usd - a.realized_usd);
 }
 
-function buildTimeline(events: any[], transfers: any[]): TimelineEvent[] {
+function buildTimeline(events: any[]): TimelineEvent[] {
   const out: TimelineEvent[] = [];
   for (const e of events) {
     const decoded = e?.decoded?.name ?? e?.event_name ?? "event";
@@ -117,17 +121,18 @@ function buildTimeline(events: any[], transfers: any[]): TimelineEvent[] {
       tx: e?.tx_hash ?? null,
     });
   }
-  // Heuristic: largest single OUT after peak liquidity = rug
-  const sortedOut = transfers
-    .filter((t) => Number(t?.delta_quote ?? 0) > 0)
-    .sort((a, b) => Number(b.delta_quote) - Number(a.delta_quote));
-  const rug = sortedOut[0];
-  if (rug) {
+  // Heuristic: largest single Transfer by USD = likely rug exit
+  const transfers = events
+    .filter((e: any) => (e?.decoded?.name ?? "").toLowerCase() === "transfer")
+    .map((e: any) => ({ ...e, _usd: Number(e?.value_quote ?? 0) }))
+    .sort((a: any, b: any) => b._usd - a._usd);
+  const rug = transfers[0];
+  if (rug && rug._usd > 0) {
     out.push({
       ts: rug.block_signed_at,
       kind: "rug",
       label: "largest extraction",
-      usd: Number(rug.delta_quote),
+      usd: rug._usd,
       tx: rug.tx_hash,
     });
   }
@@ -151,13 +156,17 @@ function lifespanFromTimeline(t: TimelineEvent[]): number | null {
   return last - first;
 }
 
-async function dossier(token: string, transfers: any[]): Promise<Deployer | null> {
-  // Earliest sender of this token = likely deployer
-  const sorted = transfers
+async function dossier(token: string, events: any[]): Promise<Deployer | null> {
+  // Earliest event sender = likely deployer
+  const sorted = events
     .slice()
     .sort((a, b) => +new Date(a.block_signed_at) - +new Date(b.block_signed_at));
   const first = sorted[0];
-  const deployerAddr = first?.from_address ?? null;
+  const params = first?.decoded?.params ?? [];
+  const deployerAddr =
+    params.find((p: any) => p?.name === "from")?.value ??
+    first?.sender_address ??
+    null;
   if (!deployerAddr) return null;
 
   const txs: any = await walletTransactions(CHAIN, deployerAddr, 100).catch(() => ({ items: [] }));
