@@ -1,5 +1,10 @@
 # Forensic
 
+![Next.js](https://img.shields.io/badge/Next.js-14-black?style=flat-square&logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)
+![Vercel](https://img.shields.io/badge/Vercel-deployed-black?style=flat-square&logo=vercel)
+![GoldRush](https://img.shields.io/badge/GoldRush-API-purple?style=flat-square)
+
 **Public rugpull autopsies for EVM tokens, powered by [GoldRush](https://goldrush.dev/docs).**
 
 Paste any EVM token address (Ethereum, Base, BSC). Get a forensic post-mortem:
@@ -11,6 +16,66 @@ Paste any EVM token address (Ethereum, Base, BSC). Get a forensic post-mortem:
 - AI-written narrative summarizing the attack
 
 > Built for the **Build with GoldRush Track (Powered by Covalent)** hackathon.
+
+## Architecture
+
+```
+┌─────────────┐
+│   Browser   │
+└──────┬──────┘
+       │ HTTP
+       ▼
+┌─────────────────────────────────────────┐
+│         Next.js App Router              │
+│  ┌──────────────┐  ┌─────────────────┐ │
+│  │  page.tsx    │  │  autopsy.ts     │ │
+│  │  (UI)        │  │  (logic)        │ │
+│  └──────────────┘  └────────┬────────┘ │
+└─────────────────────────────┼───────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────┐
+│         GoldRush API                    │
+│  ┌──────────────┐  ┌─────────────────┐ │
+│  │ tokenHolders │  │   logEvents     │ │
+│  │ walletBalances│  │  latestBlock    │ │
+│  └──────────────┘  └─────────────────┘ │
+└─────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────┐
+│         Supabase (Cache)                 │
+│  ┌─────────────────────────────────────┐ │
+│  │  autopsies table                    │ │
+│  └─────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
+```
+
+## Project Structure
+
+```
+forensic/
+├── src/
+│   ├── app/
+│   │   ├── page.tsx              # Landing page with example tokens
+│   │   └── token/[address]/
+│   │       └── page.tsx          # Autopsy display page
+│   ├── components/
+│   │   └── SearchBox.tsx        # Token address input
+│   ├── lib/
+│   │   ├── autopsy.ts            # Core autopsy logic
+│   │   ├── db.ts                 # Supabase client
+│   │   ├── goldrush.ts           # GoldRush API wrappers
+│   │   ├── narrate.ts            # AI narrative generation
+│   │   └── types.ts              # TypeScript types
+│   └── styles/
+│       └── globals.css          # Tailwind + custom styles
+├── scripts/
+│   └── pregenerate.ts            # Pre-generate autopsies
+├── supabase/
+│   └── schema.sql                # Database schema
+└── package.json
+```
 
 ## Why GoldRush
 
@@ -24,28 +89,65 @@ Decoded events + cross-chain wallet data + USD pricing in a single API is GoldRu
 
 ## Stack
 
-- Next.js 14 (App Router) on Vercel
-- Supabase (cache for autopsy results)
-- Groq Llama 3.3 70B (free tier) for AI narratives
-- GoldRush API for all blockchain data
+- **Frontend:** Next.js 14 (App Router), TailwindCSS, Lucide icons
+- **Backend:** Vercel serverless functions
+- **Database:** Supabase (PostgreSQL) for caching
+- **AI:** Groq Llama 3.3 70B for narrative generation
+- **Data:** GoldRush API for all blockchain data
 
 ## Live Demo
 
 https://forensic-olive.vercel.app
 
-## Local Dev
+## Testing
+
+### Manual Testing
+
+1. **Test with known tokens:**
+   ```bash
+   # Visit these URLs with ?refresh=1 to bypass cache
+   https://forensic-olive.vercel.app/token/0x6b175474e89094c44da98b954eedeac495271d0f?refresh=1  # DAI
+   https://forensic-olive.vercel.app/token/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48?refresh=1  # USDC
+   ```
+
+2. **Verify features:**
+   - Timeline shows Transfer/Approval events
+   - Top extractors list excludes burn/router addresses
+   - Deployer dossier shows cross-chain tokens with chain badges
+   - AI narrative summarizes the attack
+
+3. **Check Vercel logs:**
+   - Go to Vercel dashboard → Deployments → Runtime Logs
+   - Look for `[detectChain]` and `[autopsy]` diagnostic lines
+
+### Local Development
 
 ```bash
-cp .env.example .env.local   # fill GoldRush API key
+# 1. Install dependencies
 pnpm install
+
+# 2. Set up environment variables
+cp .env.example .env.local
+# Edit .env.local and add:
+# COVALENT_API_KEY=your_goldrush_api_key
+# SUPABASE_URL=your_supabase_url
+# SUPABASE_ANON_KEY=your_supabase_anon_key
+# GROQ_API_KEY=your_groq_api_key
+
+# 3. Run database schema
+# Go to Supabase dashboard → SQL Editor → Paste supabase/schema.sql → Run
+
+# 4. Start dev server
 pnpm dev
+
+# 5. Open http://localhost:3000
 ```
 
-## Deploy
+## Deployment
 
 1. Push to GitHub
 2. Import repo on Vercel
-3. Add env vars from `.env.example`
+3. Add environment variables from `.env.example`
 4. Run `supabase/schema.sql` in your Supabase project
 5. Deploy
 
