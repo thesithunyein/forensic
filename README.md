@@ -87,6 +87,55 @@ Forensic is impossible on raw RPC. GoldRush provides:
 
 Decoded events + cross-chain wallet data + USD pricing in a single API is GoldRush's advantage. We use it to surface who drained the funds and where the deployer is active next.
 
+## Key Features
+
+### Timeline Reconstruction
+- Parses all Transfer and Approval events from log events
+- Shows the complete lifecycle from mint to rug
+- USD-valued transfers for immediate impact assessment
+
+### Extractor Ranking
+- Identifies wallets that drained the most funds
+- Filters out known burn addresses, DEX routers, and system contracts
+- Shows realized USD amounts for each extractor
+
+### Cross-Chain Deployer Dossier
+- Probes deployer wallet balances across Ethereum, Base, and BSC
+- Shows all other tokens deployed by the same address
+- Chain badges for each token (ETH, Base, BSC)
+- Highlights multi-chain repeat offenders
+
+### AI Narrative
+- Uses Groq Llama 3.3 70B to summarize the attack
+- Cites specific facts from the autopsy data
+- Provides a human-readable forensic report
+
+## Technical Challenges
+
+### GoldRush API Limits
+- Trial tier limits log events to 1M block range
+- Implemented progressive window fallback (50k → 10k → 2k blocks)
+- Added 5s timeout to chain detection probes to prevent serverless timeout
+
+### Chain Detection
+- Base mainnet `tokenHolders` endpoint rejects page-size parameters
+- Temporarily disabled auto-detection; defaults to eth-mainnet
+- Can be re-enabled once Base API is fixed
+
+### Caching Strategy
+- Supabase caches autopsy results for 6 hours
+- `?refresh=1` query parameter bypasses cache for testing
+- Reduces API calls and improves performance
+
+## Future Improvements
+
+- Re-enable chain auto-detection once Base API is stable
+- Add support for more EVM chains (Polygon, Arbitrum, Optimism)
+- Implement real-time deployer monitoring with alerts
+- Add liquidity pool analysis to identify rug transactions
+- Integrate with more AI models for narrative generation
+- Add export feature for forensic reports (PDF, JSON)
+
 ## Stack
 
 - **Frontend:** Next.js 14 (App Router), TailwindCSS, Lucide icons
