@@ -54,7 +54,7 @@ async function detectChain(address: string): Promise<Chain> {
     CHAINS.map(async (c) => {
       try {
         const r: any = await Promise.race([
-          tokenHolders(c, address, 100),
+          tokenHolders(c, address),
           new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), timeoutMs)),
         ]);
         return { c, count: r?.items?.length ?? 0, err: null as string | null };
