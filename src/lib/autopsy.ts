@@ -48,10 +48,15 @@ export async function getOrBuildAutopsy(address: string, force = false): Promise
 
 async function detectChain(address: string): Promise<Chain> {
   // Probe each chain in parallel for token holders. First chain with >0 wins.
+  // Timeout each probe at 5s to avoid hanging.
+  const timeoutMs = 5000;
   const probes = await Promise.all(
     CHAINS.map(async (c) => {
       try {
-        const r: any = await tokenHolders(c, address, 100);
+        const r: any = await Promise.race([
+          tokenHolders(c, address, 100),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), timeoutMs)),
+        ]);
         return { c, count: r?.items?.length ?? 0, err: null as string | null };
       } catch (e: any) {
         return { c, count: 0, err: String(e?.message ?? e).slice(0, 120) };
