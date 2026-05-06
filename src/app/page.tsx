@@ -26,7 +26,7 @@ export default async function HomePage() {
       </header>
 
       <section className="max-w-3xl mx-auto px-6 pt-24 pb-16 text-center">
-        <h1 className="text-5xl md:text-6xl font-bold tracking-tight">
+        <h1 className="text-5xl md:text-6xl font-bold tracking-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
           Every rug, <span className="text-accent">autopsied.</span>
         </h1>
         <p className="mt-5 text-lg text-muted">
@@ -36,8 +36,15 @@ export default async function HomePage() {
         <div className="mt-10">
           <SearchBox />
         </div>
-        <div className="mt-6 text-xs text-muted font-mono">
-          powered by GoldRush · decoded log events · cross-chain deployer intel
+        <div className="mt-6 text-xs text-muted font-mono flex items-center justify-center gap-4">
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-green-500"></span>
+            powered by GoldRush
+          </span>
+          <span>·</span>
+          <span>decoded log events</span>
+          <span>·</span>
+          <span>cross-chain deployer intel</span>
         </div>
       </section>
 
@@ -55,16 +62,16 @@ export default async function HomePage() {
                 no autopsies indexed yet — try an example:
               </div>
               <div className="flex flex-wrap gap-3">
-                <Link href="/token/0x6b175474e89094c44da98b954eedeac495271d0f" className="px-4 py-2 rounded-lg border border-border bg-panel hover:border-accent text-sm font-mono">
+                <Link href="/token/0x6b175474e89094c44da98b954eedeac495271d0f" className="px-4 py-2 rounded-lg border border-border bg-panel hover:border-accent hover:bg-accent/10 text-sm font-mono transition-all">
                   DAI
                 </Link>
-                <Link href="/token/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" className="px-4 py-2 rounded-lg border border-border bg-panel hover:border-accent text-sm font-mono">
+                <Link href="/token/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" className="px-4 py-2 rounded-lg border border-border bg-panel hover:border-accent hover:bg-accent/10 text-sm font-mono transition-all">
                   USDC
                 </Link>
-                <Link href="/token/0x2260fac5e5542a773aa44fbcfedf7c193bc2c599" className="px-4 py-2 rounded-lg border border-border bg-panel hover:border-accent text-sm font-mono">
+                <Link href="/token/0x2260fac5e5542a773aa44fbcfedf7c193bc2c599" className="px-4 py-2 rounded-lg border border-border bg-panel hover:border-accent hover:bg-accent/10 text-sm font-mono transition-all">
                   WBTC
                 </Link>
-                <Link href="/token/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2" className="px-4 py-2 rounded-lg border border-border bg-panel hover:border-accent text-sm font-mono">
+                <Link href="/token/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2" className="px-4 py-2 rounded-lg border border-border bg-panel hover:border-accent hover:bg-accent/10 text-sm font-mono transition-all">
                   WETH
                 </Link>
               </div>
