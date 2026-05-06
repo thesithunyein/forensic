@@ -131,14 +131,28 @@ export default async function AutopsyPage({
             </div>
             {(a.deployer.other_tokens ?? []).length > 0 && (
               <div className="mt-4 space-y-2">
-                <div className="text-xs text-muted font-mono">other tokens</div>
+                <div className="text-xs text-muted font-mono">
+                  other tokens by this deployer
+                  {(a.deployer.chains?.length ?? 0) > 1 && (
+                    <span className="ml-2 text-accent">
+                      · active on {a.deployer.chains!.length} chains
+                    </span>
+                  )}
+                </div>
                 {a.deployer.other_tokens!.map((t) => (
                   <Link
-                    key={t.address}
+                    key={`${t.chain}-${t.address}`}
                     href={`/token/${t.address}`}
                     className="flex items-center justify-between rounded border border-border px-3 py-2 hover:border-accent"
                   >
-                    <span className="font-mono text-xs">{t.symbol ?? shortAddr(t.address)}</span>
+                    <span className="font-mono text-xs flex items-center gap-2">
+                      {t.chain && (
+                        <span className="text-[10px] uppercase tracking-wider text-muted bg-bg px-1.5 py-0.5 rounded border border-border">
+                          {t.chain.replace("-mainnet", "")}
+                        </span>
+                      )}
+                      {t.symbol ?? shortAddr(t.address)}
+                    </span>
                     <span className="text-xs text-muted">{t.outcome ?? "?"}</span>
                   </Link>
                 ))}

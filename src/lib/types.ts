@@ -16,6 +16,7 @@ export type DeployerOtherToken = {
   address: string;
   symbol?: string | null;
   outcome?: string | null;
+  chain?: string;
 };
 
 export type Deployer = {

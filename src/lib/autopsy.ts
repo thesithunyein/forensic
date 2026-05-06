@@ -1,8 +1,6 @@
 import {
   Chain,
-  tokenMetadata,
   tokenHolders,
-  walletTransactions,
   walletBalances,
   logEvents,
   latestBlock,
@@ -12,8 +10,23 @@ import { humanDuration } from "./format";
 import type { Autopsy, Extractor, TimelineEvent, Deployer } from "./types";
 import { narrate } from "./narrate";
 
-const CHAIN: Chain = "eth-mainnet";
+const CHAINS: Chain[] = ["eth-mainnet", "base-mainnet", "bsc-mainnet"];
 const FRESH_MS = 1000 * 60 * 60 * 6; // 6h
+
+// Common burn / system / DEX-router addresses that are not real "extractors".
+const IGNORED_EXTRACTORS = new Set(
+  [
+    "0x0000000000000000000000000000000000000000", // burn
+    "0x000000000000000000000000000000000000dead", // burn
+    "0x7a250d5630b4cf539739df2c5dacb4c659f2488d", // Uniswap V2 router
+    "0xe592427a0aece92de3edee1f18e0157c05861564", // Uniswap V3 router
+    "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45", // Uniswap V3 router 2
+    "0x10ed43c718714eb63d5aa57b78b54704e256024e", // PancakeSwap V2 router
+    "0x13f4ea83d0bd40e75c8222255bc855a974568dd4", // PancakeSwap V3 router
+    "0x2626664c2603336e57b271c5c0b26f421741e481", // Uniswap V3 SwapRouter02 Base
+    "0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24", // Uniswap V2 router Base
+  ].map((a) => a.toLowerCase()),
+);
 
 export async function getOrBuildAutopsy(address: string, force = false): Promise<Autopsy | null> {
   const cached = await getCachedAutopsy(address);
@@ -33,16 +46,32 @@ export async function getOrBuildAutopsy(address: string, force = false): Promise
   return built;
 }
 
+async function detectChain(address: string): Promise<Chain> {
+  // Probe each chain in parallel for token holders. First chain with >0 wins.
+  const probes = await Promise.all(
+    CHAINS.map(async (c) => {
+      try {
+        const r: any = await tokenHolders(c, address, 1);
+        return { c, count: r?.items?.length ?? 0 };
+      } catch {
+        return { c, count: 0 };
+      }
+    }),
+  );
+  const winner = probes.find((p) => p.count > 0);
+  return winner?.c ?? "eth-mainnet";
+}
+
 export async function buildAutopsy(address: string): Promise<Autopsy> {
-  // Run all endpoints in parallel, none can hard-fail the autopsy.
-  // Note: transfers_v2 needs a wallet path, so we skip it for token-level autopsy.
-  // Token activity comes from logEvents (decoded Transfer/Swap topics).
-  // Trial-tier max range is 1M blocks. Window to most recent ~1M.
-  // Try API first; on failure estimate from genesis (Eth: 2015-07-30, ~12s blocks).
+  // 1. Auto-detect which chain the token lives on.
+  const CHAIN = await detectChain(address);
+
+  // 2. Estimate current block tip (genesis + ~12s for ETH; close enough for window math).
   const tip =
     (await latestBlock(CHAIN)) ??
     Math.floor((Date.now() - 1438269988_000) / 12_000);
-  // Try progressively smaller windows; high-volume tokens 504 on big ranges.
+
+  // 3. Try progressively smaller windows; high-volume tokens 504 on big ranges.
   const windows: number[] = [50_000, 10_000, 2_000];
   let evs: any = { items: [] };
   let evsErr: string | null = null;
@@ -55,18 +84,19 @@ export async function buildAutopsy(address: string): Promise<Autopsy> {
       break;
     } catch (e: any) {
       evsErr = String(e?.message ?? e);
-      // keep trying smaller
     }
   }
-  const evWindow: [number, number | "latest"] = [Math.max(0, tip - (usedWindow || windows[windows.length - 1])), "latest"];
+  const evWindow: [number, number | "latest"] = [
+    Math.max(0, tip - (usedWindow || windows[windows.length - 1])),
+    "latest",
+  ];
 
-  const [holdersR] = await Promise.allSettled([
-    tokenHolders(CHAIN, address, 100),
-  ]);
+  const [holdersR] = await Promise.allSettled([tokenHolders(CHAIN, address, 100)]);
   const holders: any = holdersR.status === "fulfilled" ? holdersR.value : { items: [] };
-  const meta: any = null; // metadata derived from holders[0]
+  const meta: any = null;
 
   console.log("[autopsy]", address, {
+    chain: CHAIN,
     tip,
     evWindow,
     usedWindow,
@@ -97,8 +127,8 @@ export async function buildAutopsy(address: string): Promise<Autopsy> {
   const lifespan_ms = lifespanFromTimeline(timeline);
   const lifespan_human = lifespan_ms ? humanDuration(lifespan_ms) : null;
 
-  // Deployer: try to extract from earliest event sender
-  const deployer = await dossier(address, events).catch(() => null);
+  // Deployer: try to extract from earliest event sender, then probe all chains.
+  const deployer = await dossier(address, events, CHAIN).catch(() => null);
 
   const partial: Autopsy = {
     token_address: address,
@@ -136,11 +166,13 @@ function rankExtractorsFromEvents(events: any[], token: string): Extractor[] {
     const name = (e?.decoded?.name ?? "").toLowerCase();
     if (name !== "transfer") continue;
     const params = e?.decoded?.params ?? [];
-    const from = params.find((p: any) => p?.name === "from")?.value;
+    const from: string | undefined = params.find((p: any) => p?.name === "from")?.value;
     const value = Number(params.find((p: any) => p?.name === "value")?.value ?? 0);
     const usd = Number(e?.value_quote ?? 0) || 0;
     if (!from) continue;
-    if (from.toLowerCase() === token.toLowerCase()) continue;
+    const fromLow = from.toLowerCase();
+    if (fromLow === token.toLowerCase()) continue;
+    if (IGNORED_EXTRACTORS.has(fromLow)) continue;
     by[from] = (by[from] ?? 0) + (usd > 0 ? usd : value / 1e18);
   }
   return Object.entries(by)
@@ -196,32 +228,50 @@ function lifespanFromTimeline(t: TimelineEvent[]): number | null {
   return last - first;
 }
 
-async function dossier(token: string, events: any[]): Promise<Deployer | null> {
+async function dossier(token: string, events: any[], primaryChain: Chain): Promise<Deployer | null> {
   // Earliest event sender = likely deployer
   const sorted = events
     .slice()
     .sort((a, b) => +new Date(a.block_signed_at) - +new Date(b.block_signed_at));
   const first = sorted[0];
   const params = first?.decoded?.params ?? [];
-  const deployerAddr =
-    params.find((p: any) => p?.name === "from")?.value ??
-    first?.sender_address ??
-    null;
+  const deployerAddr: string | null =
+    params.find((p: any) => p?.name === "from")?.value ?? first?.sender_address ?? null;
   if (!deployerAddr) return null;
 
-  const txs: any = await walletTransactions(CHAIN, deployerAddr, 100).catch(() => ({ items: [] }));
-  const balances: any = await walletBalances(CHAIN, deployerAddr).catch(() => ({ items: [] }));
+  // KILLER FEATURE: probe deployer balances on every supported chain.
+  const perChain = await Promise.all(
+    CHAINS.map(async (c) => {
+      const balances: any = await walletBalances(c, deployerAddr).catch(() => ({ items: [] }));
+      const erc20s = (balances?.items ?? []).filter(
+        (b: any) =>
+          b?.contract_address &&
+          b.contract_address.toLowerCase() !== token.toLowerCase() &&
+          b?.type !== "dust" &&
+          (b?.contract_decimals ?? 0) > 0,
+      );
+      return { chain: c, count: erc20s.length, items: erc20s.slice(0, 6) };
+    }),
+  );
 
-  const otherTokens: { address: string; symbol?: string | null }[] = (balances?.items ?? [])
-    .filter((b: any) => b?.contract_address && b.contract_address !== token)
-    .slice(0, 10)
-    .map((b: any) => ({ address: b.contract_address, symbol: b?.contract_ticker_symbol ?? null }));
+  const activeChains = perChain.filter((p) => p.count > 0).map((p) => p.chain);
+  const otherTokens: { address: string; symbol?: string | null; chain?: string }[] = perChain
+    .flatMap((p) =>
+      p.items.map((b: any) => ({
+        address: b.contract_address,
+        symbol: b?.contract_ticker_symbol ?? null,
+        chain: p.chain,
+      })),
+    )
+    .slice(0, 12);
+
+  const totalTokens = perChain.reduce((s, p) => s + p.count, 0);
 
   return {
     address: deployerAddr,
-    token_count: 1 + otherTokens.length,
+    token_count: totalTokens || 1,
     rug_count: 0,
-    chains: [CHAIN],
+    chains: activeChains.length ? activeChains : [primaryChain],
     other_tokens: otherTokens.map((t) => ({ ...t, outcome: null })),
   };
 }
