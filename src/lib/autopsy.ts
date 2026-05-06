@@ -52,12 +52,13 @@ async function detectChain(address: string): Promise<Chain> {
     CHAINS.map(async (c) => {
       try {
         const r: any = await tokenHolders(c, address, 1);
-        return { c, count: r?.items?.length ?? 0 };
-      } catch {
-        return { c, count: 0 };
+        return { c, count: r?.items?.length ?? 0, err: null as string | null };
+      } catch (e: any) {
+        return { c, count: 0, err: String(e?.message ?? e).slice(0, 120) };
       }
     }),
   );
+  console.log("[detectChain]", address, probes);
   const winner = probes.find((p) => p.count > 0);
   return winner?.c ?? "eth-mainnet";
 }
