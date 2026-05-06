@@ -15,6 +15,7 @@ export default async function HomePage() {
           <Link href="/" className="flex items-center gap-2 font-mono">
             <Skull className="w-5 h-5 text-accent" />
             <span className="font-semibold tracking-tight">forensic</span>
+            <span className="px-2 py-0.5 rounded bg-border text-xs text-muted">ETH</span>
           </Link>
           <nav className="flex items-center gap-6 text-sm text-muted">
             <Link href="/recent">Recent</Link>
@@ -49,8 +50,24 @@ export default async function HomePage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {recent.length === 0 ? (
-            <div className="col-span-full text-muted text-sm font-mono">
-              no autopsies indexed yet — be the first
+            <div className="col-span-full space-y-4">
+              <div className="text-muted text-sm font-mono">
+                no autopsies indexed yet — try an example:
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Link href="/token/0x6b175474e89094c44da98b954eedeac495271d0f" className="px-4 py-2 rounded-lg border border-border bg-panel hover:border-accent text-sm font-mono">
+                  DAI
+                </Link>
+                <Link href="/token/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" className="px-4 py-2 rounded-lg border border-border bg-panel hover:border-accent text-sm font-mono">
+                  USDC
+                </Link>
+                <Link href="/token/0x2260fac5e5542a773aa44fbcfedf7c193bc2c599" className="px-4 py-2 rounded-lg border border-border bg-panel hover:border-accent text-sm font-mono">
+                  WBTC
+                </Link>
+                <Link href="/token/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2" className="px-4 py-2 rounded-lg border border-border bg-panel hover:border-accent text-sm font-mono">
+                  WETH
+                </Link>
+              </div>
             </div>
           ) : (
             recent.map((a) => (
