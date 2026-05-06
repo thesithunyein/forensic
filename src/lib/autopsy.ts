@@ -42,33 +42,44 @@ export async function buildAutopsy(address: string): Promise<Autopsy> {
   const tip =
     (await latestBlock(CHAIN)) ??
     Math.floor((Date.now() - 1438269988_000) / 12_000);
-  const evWindow: [number, number | "latest"] = [
-    Math.max(0, tip - 999_000),
-    "latest",
-  ];
+  // Try progressively smaller windows; high-volume tokens 504 on big ranges.
+  const windows: number[] = [50_000, 10_000, 2_000];
+  let evs: any = { items: [] };
+  let evsErr: string | null = null;
+  let usedWindow = 0;
+  for (const w of windows) {
+    try {
+      const r: any = await logEvents(CHAIN, address, Math.max(0, tip - w), "latest");
+      evs = r;
+      usedWindow = w;
+      break;
+    } catch (e: any) {
+      evsErr = String(e?.message ?? e);
+      // keep trying smaller
+    }
+  }
+  const evWindow: [number, number | "latest"] = [Math.max(0, tip - (usedWindow || windows[windows.length - 1])), "latest"];
 
-  const [holdersR, evsR] = await Promise.allSettled([
+  const [holdersR] = await Promise.allSettled([
     tokenHolders(CHAIN, address, 100),
-    logEvents(CHAIN, address, evWindow[0], evWindow[1]),
   ]);
   const holders: any = holdersR.status === "fulfilled" ? holdersR.value : { items: [] };
-  const evs: any = evsR.status === "fulfilled" ? evsR.value : { items: [] };
   const meta: any = null; // metadata derived from holders[0]
 
   console.log("[autopsy]", address, {
     tip,
     evWindow,
+    usedWindow,
     holdersCount: holders?.items?.length ?? 0,
     holdersErr: holdersR.status === "rejected" ? String((holdersR as any).reason?.message) : null,
     evsCount: evs?.items?.length ?? 0,
-    evsErr: evsR.status === "rejected" ? String((evsR as any).reason?.message) : null,
+    evsErr,
   });
 
   if (!holders?.items?.length && !evs?.items?.length) {
-    const errs = [holdersR, evsR]
-      .filter((r) => r.status === "rejected")
-      .map((r: any) => r.reason?.message ?? String(r.reason));
-    throw new Error("All data sources empty: " + errs.join(" | "));
+    throw new Error(
+      "All data sources empty" + (evsErr ? ": evs=" + evsErr.slice(0, 200) : ""),
+    );
   }
 
   const item = meta?.items?.[0] ?? meta ?? holders?.items?.[0];
@@ -105,9 +116,10 @@ export async function buildAutopsy(address: string): Promise<Autopsy> {
     _debug: {
       tip,
       window: `${evWindow[0]}..${evWindow[1]}`,
+      usedWindow,
       holdersCount: holders?.items?.length ?? 0,
       evsCount: evs?.items?.length ?? 0,
-      evsErr: evsR.status === "rejected" ? String((evsR as any).reason?.message) : null,
+      evsErr: evsErr ? evsErr.slice(0, 300) : null,
       holdersErr:
         holdersR.status === "rejected" ? String((holdersR as any).reason?.message) : null,
     },
