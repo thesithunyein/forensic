@@ -70,7 +70,9 @@ async function detectChain(address: string): Promise<Chain> {
 
 export async function buildAutopsy(address: string): Promise<Autopsy> {
   // 1. Auto-detect which chain the token lives on.
-  const CHAIN = await detectChain(address);
+  // TEMP: Disabled due to Base tokenHolders timeout issues. Default to eth-mainnet.
+  const CHAIN: Chain = "eth-mainnet";
+  // const CHAIN = await detectChain(address);
 
   // 2. Estimate current block tip (genesis + ~12s for ETH; close enough for window math).
   const tip =
