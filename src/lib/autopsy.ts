@@ -51,7 +51,7 @@ async function detectChain(address: string): Promise<Chain> {
   const probes = await Promise.all(
     CHAINS.map(async (c) => {
       try {
-        const r: any = await tokenHolders(c, address, 10);
+        const r: any = await tokenHolders(c, address, 100);
         return { c, count: r?.items?.length ?? 0, err: null as string | null };
       } catch (e: any) {
         return { c, count: 0, err: String(e?.message ?? e).slice(0, 120) };
