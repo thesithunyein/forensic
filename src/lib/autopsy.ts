@@ -102,6 +102,15 @@ export async function buildAutopsy(address: string): Promise<Autopsy> {
     extractors: extractors.slice(0, 20),
     deployer,
     updated_at: new Date().toISOString(),
+    _debug: {
+      tip,
+      window: `${evWindow[0]}..${evWindow[1]}`,
+      holdersCount: holders?.items?.length ?? 0,
+      evsCount: evs?.items?.length ?? 0,
+      evsErr: evsR.status === "rejected" ? String((evsR as any).reason?.message) : null,
+      holdersErr:
+        holdersR.status === "rejected" ? String((holdersR as any).reason?.message) : null,
+    },
   };
 
   partial.summary = await narrate(partial).catch(() => null);

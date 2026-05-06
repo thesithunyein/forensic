@@ -40,4 +40,5 @@ export type Autopsy = {
   extractors?: Extractor[];
   deployer?: Deployer | null;
   updated_at?: string;
+  _debug?: Record<string, any>;
 };

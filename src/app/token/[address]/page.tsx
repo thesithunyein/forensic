@@ -107,6 +107,15 @@ export default async function AutopsyPage({
         </div>
       </section>
 
+      {a._debug && (
+        <section className="max-w-5xl mx-auto px-6 py-4">
+          <details className="rounded-lg border border-border bg-panel p-4 text-xs font-mono text-muted">
+            <summary className="cursor-pointer">debug</summary>
+            <pre className="mt-2 whitespace-pre-wrap break-all">{JSON.stringify(a._debug, null, 2)}</pre>
+          </details>
+        </section>
+      )}
+
       {a.deployer && (
         <section className="max-w-5xl mx-auto px-6 py-8">
           <div className="flex items-center justify-between mb-4">
