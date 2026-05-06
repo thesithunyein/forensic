@@ -7,6 +7,7 @@ import WatchButton from "@/components/WatchButton";
 
 export const revalidate = 300;
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function generateMetadata({ params }: { params: { address: string } }) {
   const a = await getOrBuildAutopsy(params.address, false).catch(() => null);
